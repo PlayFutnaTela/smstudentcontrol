@@ -1,0 +1,221 @@
+/**
+ * Admin styles for SM Student Control
+ */
+
+/* General styles */
+.sm-student-control {
+    margin-top: 20px;
+}
+
+/* Estilos comuns para todas as páginas do plugin */
+.sm-student-control-filter,
+.sm-student-control-list,
+.sm-student-control-details {
+    background: #fff;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Adicione este código ao seu arquivo CSS */
+.sm-student-filter-section {
+    background-color: #fff;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 3px;
+}
+
+/* Estilos específicos para o filtro */
+.filter-container {
+    margin-bottom: 20px;
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+}
+
+.sm-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.filter-field {
+    min-width: 200px;
+}
+
+.sm-filter-column {
+    flex: 1;
+    min-width: 200px;
+}
+
+.sm-filter-column label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.sm-filter-column input,
+.sm-filter-column select {
+    width: 100%;
+}
+
+.filter-submit {
+    margin-top: 20px;
+}
+
+.sm-filter-actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+/* Tabela de estudantes */
+.students-count {
+    margin: 10px 0;
+    font-style: italic;
+}
+
+/* Student details styles */
+.student-profile {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.student-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-gap: 15px;
+    margin-top: 15px;
+}
+
+.info-item {
+    flex: 1;
+    min-width: 200px;
+    margin-bottom: 10px;
+}
+
+.info-item strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.section {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Progress bar */
+.progress-bar {
+    background: #f0f0f1;
+    height: 10px;
+    width: 100%;
+    max-width: 200px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+.progress {
+    background: #2271b1;
+    height: 100%;
+}
+
+/* Status badges */
+.status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.status.passed {
+    background: #d5e8d4;
+    color: #5d8f5a;
+}
+
+.status.failed {
+    background: #f8cecc;
+    color: #b85450;
+}
+
+/* Estilos para botões de atualização */
+
+.refresh-cache-container {
+    margin: 20px 0 10px;
+    display: flex;
+    align-items: center;
+}
+
+#refresh-student-cache.updating,
+.update-student-button.updating {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+#refresh-status,
+.update-status {
+    margin-left: 10px;
+    font-style: italic;
+}
+
+.dashicons-update {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.update-student-data {
+    margin: 15px 0;
+}
+
+/* Estilização da paginação para parecer com as tabelas admin do WordPress */
+.tablenav-pages {
+    float: right;
+    margin: 0 0 9px;
+    text-align: right;
+}
+
+.tablenav-pages .current {
+    background: #0073aa;
+    border-color: #0073aa;
+    box-shadow: none;
+    color: #fff;
+    font-weight: 600;
+}
+
+.tablenav-pages a,
+.tablenav-pages span.current {
+    display: inline-block;
+    min-width: 17px;
+    border: 1px solid #ccc;
+    padding: 3px 5px 7px;
+    background: #f7f7f7;
+    font-size: 16px;
+    line-height: 1;
+    font-weight: 400;
+    text-align: center;
+    text-decoration: none;
+}
+
+.tablenav-pages a:hover,
+.tablenav-pages a:focus {
+    background: #e5e5e5;
+}
