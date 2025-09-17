@@ -301,12 +301,18 @@ class SM_Student_Control_Cache {
         // Filtro por mês de último acesso
         if (!empty($last_access_month)) {
             list($year, $month) = explode('-', $last_access_month);
-            $start_date = "{$year}-{$month}-01 00:00:00";
-            $end_date = date('Y-m-t 23:59:59', strtotime($start_date));
             
-            $where_conditions[] = "(last_access_timestamp BETWEEN %s AND %s)";
-            $where_values[] = $start_date;
-            $where_values[] = $end_date;
+            // Criar timestamps UNIX para o início e fim do mês
+            $start_timestamp = mktime(0, 0, 0, $month, 1, $year);
+            $end_timestamp = mktime(23, 59, 59, $month, date('t', $start_timestamp), $year);
+            
+            error_log("SM Student Control: Filtering by last access month: {$last_access_month}");
+            error_log("SM Student Control: Start timestamp: {$start_timestamp} (" . date('Y-m-d H:i:s', $start_timestamp) . ")");
+            error_log("SM Student Control: End timestamp: {$end_timestamp} (" . date('Y-m-d H:i:s', $end_timestamp) . ")");
+            
+            $where_conditions[] = "(last_access_timestamp BETWEEN %d AND %d)";
+            $where_values[] = $start_timestamp;
+            $where_values[] = $end_timestamp;
         }
         
         // Adicionar WHERE se houver condições
@@ -347,7 +353,23 @@ class SM_Student_Control_Cache {
         } else {
             $prepared_select = $sql_select;
         }
+        
+        // Debug: mostrar a query final
+        error_log("SM Student Control: Final SQL query: " . $prepared_select);
+        
         $results = $wpdb->get_results($prepared_select, ARRAY_A);
+        
+        error_log("SM Student Control: Found " . count($results) . " results from cache");
+        
+        // Debug: verificar alguns dados de último acesso
+        if (!empty($results)) {
+            $sample_size = min(3, count($results));
+            for ($i = 0; $i < $sample_size; $i++) {
+                $row = $results[$i];
+                error_log("SM Student Control: Sample {$i} - User ID: {$row['user_id']}, Last Access: {$row['last_access_timestamp']} (" . 
+                    ($row['last_access_timestamp'] ? date('Y-m-d H:i:s', $row['last_access_timestamp']) : 'Never') . ")");
+            }
+        }
         
         // Processar os resultados para o formato esperado
         $students = array();
