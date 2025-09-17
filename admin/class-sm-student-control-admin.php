@@ -101,9 +101,10 @@ class SM_Student_Control_Admin {
             true
         );
         
-        // Localizar scripts (permanece igual)
+        // Localizar scripts para ambos os arquivos
         $nonce = wp_create_nonce('sm_student_control_nonce');
         
+        // Para o script de cache
         wp_localize_script(
             'sm-student-control-cache',
             'sm_student_control',
@@ -114,6 +115,20 @@ class SM_Student_Control_Admin {
                     'updating' => __('Atualizando dados...', 'sm-student-control'),
                     'success' => __('Dados atualizados com sucesso!', 'sm-student-control'),
                     'error' => __('Erro ao atualizar dados.', 'sm-student-control')
+                )
+            )
+        );
+        
+        // Para o script de admin (incluindo export)
+        wp_localize_script(
+            'sm-student-control-admin',
+            'sm_student_control_vars',
+            array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => $nonce,
+                'i18n' => array(
+                    'export_success' => __('Arquivo exportado com sucesso!', 'sm-student-control'),
+                    'export_error' => __('Erro ao exportar arquivo.', 'sm-student-control')
                 )
             )
         );
@@ -236,14 +251,31 @@ class SM_Student_Control_Admin {
      * AJAX handler para exportar dados dos alunos para Excel
      */
     public function export_students_excel_handler() {
+        // Debug log
+        error_log('SM Student Control: Export handler called');
+        
+        // Verificar se é requisição AJAX
+        if (!wp_doing_ajax()) {
+            error_log('SM Student Control: Not an AJAX request');
+            wp_send_json_error(['message' => 'Requisição inválida']);
+            return;
+        }
+        
         // Verificar segurança
-        check_ajax_referer('sm_student_control_nonce', 'security');
+        if (!check_ajax_referer('sm_student_control_nonce', 'security', false)) {
+            error_log('SM Student Control: Security check failed');
+            wp_send_json_error(['message' => 'Falha na verificação de segurança']);
+            return;
+        }
         
         // Verificar permissões
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Permissão insuficiente', 'sm-student-control')]);
+            error_log('SM Student Control: Permission denied');
+            wp_send_json_error(['message' => 'Permissão insuficiente']);
             return;
         }
+
+        error_log('SM Student Control: Security and permissions OK');
 
         // Obter parâmetros de filtro
         $filters = array(
@@ -252,18 +284,29 @@ class SM_Student_Control_Admin {
             'last_access_month' => sanitize_text_field($_POST['last_access_month'] ?? '')
         );
 
+        error_log('SM Student Control: Filters - ' . print_r($filters, true));
+
         try {
             // Gerar arquivo CSV
             $file_url = $this->generate_csv_file($filters);
             
+            error_log('SM Student Control: File URL generated - ' . ($file_url ? $file_url : 'false'));
+            
             if ($file_url) {
                 wp_send_json_success(['file_url' => $file_url]);
             } else {
-                wp_send_json_error(['message' => __('Erro ao gerar arquivo Excel', 'sm-student-control')]);
+                error_log('SM Student Control: generate_csv_file returned false');
+                wp_send_json_error(['message' => 'Nenhum dado encontrado para exportar ou erro na geração do arquivo']);
             }
             
         } catch (Exception $e) {
-            wp_send_json_error(['message' => __('Erro: ', 'sm-student-control') . $e->getMessage()]);
+            error_log('SM Student Control: Exception - ' . $e->getMessage());
+            error_log('SM Student Control: Exception trace - ' . $e->getTraceAsString());
+            wp_send_json_error(['message' => 'Erro na exportação: ' . $e->getMessage()]);
+        } catch (Error $e) {
+            error_log('SM Student Control: Fatal Error - ' . $e->getMessage());
+            error_log('SM Student Control: Fatal Error trace - ' . $e->getTraceAsString());
+            wp_send_json_error(['message' => 'Erro fatal: ' . $e->getMessage()]);
         }
     }
 
@@ -271,81 +314,109 @@ class SM_Student_Control_Admin {
      * Gera arquivo CSV com dados dos alunos (compatível com Excel)
      */
     private function generate_csv_file($filters) {
-        // Incluir classe de dados se não estiver carregada
-        if (!class_exists('SM_Student_Control_Data')) {
-            require_once plugin_dir_path(__FILE__) . '../includes/class-sm-student-control-data.php';
-        }
-
-        // Obter dados filtrados
-        $data_handler = new SM_Student_Control_Data();
-        $students_data = $data_handler->get_filtered_students_data($filters);
-
-        if (empty($students_data)) {
-            return false;
-        }
-
+        error_log('SM Student Control: Starting CSV generation with real data');
+        
         try {
-            // Criar diretório de uploads se não existir
+            // Primeiro, obter os dados reais dos alunos usando o cache
+            if (!class_exists('SM_Student_Control_Cache')) {
+                require_once plugin_dir_path(__FILE__) . '../includes/class-sm-student-control-cache.php';
+            }
+            
+            // Usar a mesma função que popula a tabela principal
+            $students_data = SM_Student_Control_Cache::get_all_students_from_cache(
+                $filters['student_search'], 
+                $filters['course_id'], 
+                $filters['last_access_month'],
+                'name', // orderby
+                'asc',  // order
+                1000,   // limite alto para pegar todos
+                1       // página 1
+            );
+            
+            $students = $students_data['items'];
+            error_log('SM Student Control: Found ' . count($students) . ' students for export');
+
+            if (empty($students)) {
+                error_log('SM Student Control: No students found for export');
+                return false;
+            }
+
+            // Criar diretório de uploads
             $upload_dir = wp_upload_dir();
+            
+            if (isset($upload_dir['error']) && $upload_dir['error']) {
+                error_log('SM Student Control: WordPress upload dir error: ' . $upload_dir['error']);
+                return false;
+            }
+            
             $plugin_upload_dir = $upload_dir['basedir'] . '/sm-student-control/';
             
             if (!file_exists($plugin_upload_dir)) {
-                wp_mkdir_p($plugin_upload_dir);
+                $created = wp_mkdir_p($plugin_upload_dir);
+                if (!$created) {
+                    error_log('SM Student Control: Failed to create directory');
+                    return false;
+                }
             }
 
-            // Nome do arquivo
-            $filename = 'alunos_' . date('Y-m-d_H-i-s') . '.csv';
+            // Nome do arquivo alterado para "tabela_"
+            $filename = 'tabela_' . date('Y-m-d_H-i-s') . '.csv';
             $file_path = $plugin_upload_dir . $filename;
+            
+            error_log('SM Student Control: Creating file - ' . $file_path);
 
             // Abrir arquivo para escrita
             $file = fopen($file_path, 'w');
             
             if (!$file) {
+                error_log('SM Student Control: Could not open file for writing');
                 return false;
             }
 
             // Adicionar BOM para UTF-8 (compatibilidade com Excel)
             fwrite($file, "\xEF\xBB\xBF");
 
-            // Cabeçalhos
+            // Cabeçalhos baseados na tabela real
             $headers = [
                 'ID',
                 'Nome',
                 'Email',
-                'Cursos Matriculados',
-                'Lições Concluídas',
-                'Quizzes Realizados',
-                'Pontuação Média',
-                'Certificados',
-                'Último Acesso'
+                'Data de registro',
+                'Último acesso',
+                'Cursos matriculados'
             ];
 
-            fputcsv($file, $headers, ';'); // Usar ponto e vírgula para compatibilidade com Excel
+            fputcsv($file, $headers, ';');
 
-            // Preencher dados
-            foreach ($students_data as $student) {
+            // Preencher com dados reais dos alunos
+            foreach ($students as $student) {
+                // Obter dados do usuário
+                $user_info = get_userdata($student['user_id']);
+                
                 $row = [
-                    $student['ID'],
-                    $student['display_name'],
-                    $student['user_email'],
-                    $student['enrolled_courses_count'],
-                    $student['completed_lessons_count'],
-                    $student['quizzes_taken_count'],
-                    $student['average_quiz_score'],
-                    $student['certificates_count'],
-                    $student['last_login_formatted']
+                    $student['user_id'],
+                    $user_info ? $user_info->display_name : 'N/A',
+                    $user_info ? $user_info->user_email : 'N/A',
+                    $user_info ? $user_info->user_registered : 'N/A',
+                    isset($student['last_login_formatted']) ? $student['last_login_formatted'] : '-',
+                    isset($student['enrolled_courses_count']) ? $student['enrolled_courses_count'] : 0
                 ];
                 
                 fputcsv($file, $row, ';');
             }
 
             fclose($file);
+            
+            error_log('SM Student Control: File written successfully with ' . count($students) . ' records');
 
             // Retornar URL do arquivo
-            return $upload_dir['baseurl'] . '/sm-student-control/' . $filename;
+            $file_url = $upload_dir['baseurl'] . '/sm-student-control/' . $filename;
+            error_log('SM Student Control: Returning file URL - ' . $file_url);
+            
+            return $file_url;
 
         } catch (Exception $e) {
-            error_log('Erro ao gerar CSV: ' . $e->getMessage());
+            error_log('SM Student Control: CSV generation error - ' . $e->getMessage());
             return false;
         }
     }

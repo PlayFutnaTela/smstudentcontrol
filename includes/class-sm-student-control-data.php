@@ -83,43 +83,26 @@ class SM_Student_Control_Data {
         if (!empty($last_access_month)) {
             $year_month = explode('-', $last_access_month);
             if (count($year_month) == 2) {
-                $year = $year_month[0];
-                $month = $year_month[1];
+                $year = intval($year_month[0]);
+                $month = intval($year_month[1]);
                 
+                // Criar timestamps para o início e fim do mês
                 $start_date = mktime(0, 0, 0, $month, 1, $year);
-                $end_date = mktime(23, 59, 59, $month + 1, 0, $year);
+                $end_date = mktime(23, 59, 59, $month, date('t', $start_date), $year);
                 
-                // Formatos de data para comparação com strings
-                $start_date_mysql = date('Y-m-d H:i:s', $start_date);
-                $end_date_mysql = date('Y-m-d H:i:s', $end_date);
-                
-                // Primeiro, forme subqueries separadas para cada tipo de atividade
-                $lessons_subquery = $wpdb->prepare(
-                    "SELECT 1 FROM {$wpdb->prefix}stm_lms_user_lessons WHERE user_id = u.ID AND end_time BETWEEN %d AND %d",
-                    $start_date, $end_date
+                // Criar subquery mais simples para último acesso
+                $where_clauses[] = $wpdb->prepare(
+                    "EXISTS (
+                        SELECT 1 FROM {$wpdb->usermeta} um_login 
+                        WHERE um_login.user_id = u.ID 
+                        AND um_login.meta_key = 'last_login'
+                        AND (
+                            (um_login.meta_value REGEXP '^[0-9]+$' AND CAST(um_login.meta_value AS UNSIGNED) BETWEEN %d AND %d)
+                            OR (STR_TO_DATE(um_login.meta_value, '%%Y-%%m-%%d %%H:%%i:%%s') BETWEEN FROM_UNIXTIME(%d) AND FROM_UNIXTIME(%d))
+                        )
+                    )",
+                    $start_date, $end_date, $start_date, $end_date
                 );
-                
-                $quizzes_subquery = $wpdb->prepare(
-                    "SELECT 1 FROM {$wpdb->prefix}stm_lms_user_quizzes WHERE user_id = u.ID AND `timestamp` BETWEEN %d AND %d", 
-                    $start_date, $end_date
-                );
-                
-                $last_login_subquery = $wpdb->prepare(
-                    "SELECT 1 FROM {$wpdb->usermeta} 
-                     WHERE user_id = u.ID AND meta_key = 'last_login' AND (
-                         (meta_value REGEXP '^[0-9]+$' AND meta_value BETWEEN %d AND %d) OR
-                         (meta_value BETWEEN %s AND %s)
-                     )",
-                    $start_date, $end_date, $start_date_mysql, $end_date_mysql
-                );
-                
-                // Agora combine as subqueries com EXISTS
-                $where_clauses[] = "(" . 
-                    "EXISTS (" . $lessons_subquery . ") OR " .
-                    "EXISTS (" . $quizzes_subquery . ") OR " .
-                    "(uc.time_updated BETWEEN " . $start_date . " AND " . $end_date . ") OR " .
-                    "EXISTS (" . $last_login_subquery . ")" .
-                ")";
             }
         }
         
