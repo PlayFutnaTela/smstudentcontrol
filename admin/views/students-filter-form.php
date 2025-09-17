@@ -41,6 +41,10 @@ $last_access_month = isset($last_access_month) ? $last_access_month : '';
                 <div class="filter-submit">
                     <button type="submit" class="button button-primary"><?php _e('Filtrar', 'sm-student-control'); ?></button>
                     <a href="?page=sm-student-control" class="button"><?php _e('Limpar Filtros', 'sm-student-control'); ?></a>
+                    <button type="button" id="export-excel-btn" class="button button-secondary" style="margin-left: 10px;">
+                        <span class="dashicons dashicons-download" style="vertical-align: middle; margin-right: 5px;"></span>
+                        <?php _e('Exportar Excel', 'sm-student-control'); ?>
+                    </button>
                 </div>
             </div>
         </form>

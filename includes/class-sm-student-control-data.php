@@ -813,4 +813,39 @@ return $wpdb->get_col(
         // Valor inválido
         return 0;
     }
+
+    /**
+     * Get filtered students data for export
+     */
+    public static function get_filtered_students_data($filters) {
+        $students = self::get_all_students(
+            $filters['student_search'],
+            $filters['course_id'],
+            $filters['last_access_month']
+        );
+
+        $students_data = [];
+
+        foreach ($students as $student_id) {
+            $user_info = get_userdata($student_id);
+            if (!$user_info) continue;
+
+            $student_data = self::get_student_data($student_id);
+            $last_access = self::get_student_last_access($student_id);
+
+            $students_data[] = [
+                'ID' => $student_id,
+                'display_name' => $user_info->display_name,
+                'user_email' => $user_info->user_email,
+                'enrolled_courses_count' => count($student_data['courses']),
+                'completed_lessons_count' => $student_data['completed_lessons_count'],
+                'quizzes_taken_count' => $student_data['quizzes_taken_count'],
+                'average_quiz_score' => $student_data['average_quiz_score'],
+                'certificates_count' => $student_data['certificates_count'],
+                'last_login_formatted' => $last_access['formatted']
+            ];
+        }
+
+        return $students_data;
+    }
 }

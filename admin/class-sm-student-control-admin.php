@@ -18,6 +18,7 @@ class SM_Student_Control_Admin {
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('wp_ajax_update_single_student', array($this, 'update_single_student_handler'));
         add_action('wp_ajax_nopriv_update_single_student', array($this, 'restricted_access_handler'));
+        add_action('wp_ajax_export_students_excel', array($this, 'export_students_excel_handler'));
     }
 
     /**
@@ -229,5 +230,123 @@ class SM_Student_Control_Admin {
      */
     public function restricted_access_handler() {
         wp_send_json_error(['message' => __('Acesso restrito', 'sm-student-control')]);
+    }
+
+    /**
+     * AJAX handler para exportar dados dos alunos para Excel
+     */
+    public function export_students_excel_handler() {
+        // Verificar segurança
+        check_ajax_referer('sm_student_control_nonce', 'security');
+        
+        // Verificar permissões
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permissão insuficiente', 'sm-student-control')]);
+            return;
+        }
+
+        // Obter parâmetros de filtro
+        $filters = array(
+            'student_search' => sanitize_text_field($_POST['student_search'] ?? ''),
+            'course_id' => intval($_POST['course_id'] ?? 0),
+            'last_access_month' => sanitize_text_field($_POST['last_access_month'] ?? '')
+        );
+
+        try {
+            // Gerar arquivo CSV
+            $file_url = $this->generate_csv_file($filters);
+            
+            if ($file_url) {
+                wp_send_json_success(['file_url' => $file_url]);
+            } else {
+                wp_send_json_error(['message' => __('Erro ao gerar arquivo Excel', 'sm-student-control')]);
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error(['message' => __('Erro: ', 'sm-student-control') . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Gera arquivo CSV com dados dos alunos (compatível com Excel)
+     */
+    private function generate_csv_file($filters) {
+        // Incluir classe de dados se não estiver carregada
+        if (!class_exists('SM_Student_Control_Data')) {
+            require_once plugin_dir_path(__FILE__) . '../includes/class-sm-student-control-data.php';
+        }
+
+        // Obter dados filtrados
+        $data_handler = new SM_Student_Control_Data();
+        $students_data = $data_handler->get_filtered_students_data($filters);
+
+        if (empty($students_data)) {
+            return false;
+        }
+
+        try {
+            // Criar diretório de uploads se não existir
+            $upload_dir = wp_upload_dir();
+            $plugin_upload_dir = $upload_dir['basedir'] . '/sm-student-control/';
+            
+            if (!file_exists($plugin_upload_dir)) {
+                wp_mkdir_p($plugin_upload_dir);
+            }
+
+            // Nome do arquivo
+            $filename = 'alunos_' . date('Y-m-d_H-i-s') . '.csv';
+            $file_path = $plugin_upload_dir . $filename;
+
+            // Abrir arquivo para escrita
+            $file = fopen($file_path, 'w');
+            
+            if (!$file) {
+                return false;
+            }
+
+            // Adicionar BOM para UTF-8 (compatibilidade com Excel)
+            fwrite($file, "\xEF\xBB\xBF");
+
+            // Cabeçalhos
+            $headers = [
+                'ID',
+                'Nome',
+                'Email',
+                'Cursos Matriculados',
+                'Lições Concluídas',
+                'Quizzes Realizados',
+                'Pontuação Média',
+                'Certificados',
+                'Último Acesso'
+            ];
+
+            fputcsv($file, $headers, ';'); // Usar ponto e vírgula para compatibilidade com Excel
+
+            // Preencher dados
+            foreach ($students_data as $student) {
+                $row = [
+                    $student['ID'],
+                    $student['display_name'],
+                    $student['user_email'],
+                    $student['enrolled_courses_count'],
+                    $student['completed_lessons_count'],
+                    $student['quizzes_taken_count'],
+                    $student['average_quiz_score'],
+                    $student['certificates_count'],
+                    $student['last_login_formatted']
+                ];
+                
+                fputcsv($file, $row, ';');
+            }
+
+            fclose($file);
+
+            // Retornar URL do arquivo
+            return $upload_dir['baseurl'] . '/sm-student-control/' . $filename;
+
+        } catch (Exception $e) {
+            error_log('Erro ao gerar CSV: ' . $e->getMessage());
+            return false;
+        }
     }
 }

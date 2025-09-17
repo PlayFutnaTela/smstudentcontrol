@@ -94,6 +94,10 @@ function sm_get_sortable_column($column, $label) {
                 <!-- Botões de filtro -->
                 <input type="submit" class="button button-primary" value="<?php _e('Filtrar', 'sm-student-control'); ?>">
                 <a href="?page=sm-student-control" class="button"><?php _e('Limpar Filtros', 'sm-student-control'); ?></a> <!-- Clear Filters → Limpar Filtros -->
+                <button type="button" id="export-excel-btn" class="button button-secondary" style="margin-left: 10px;">
+                    <span class="dashicons dashicons-download" style="vertical-align: middle; margin-right: 5px;"></span>
+                    <?php _e('Exportar Excel', 'sm-student-control'); ?>
+                </button>
             </div>
         </div>
     </form>
