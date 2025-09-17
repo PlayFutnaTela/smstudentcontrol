@@ -335,6 +335,11 @@ class SM_Student_Control_Admin {
             
             $students = $students_data['items'];
             error_log('SM Student Control: Found ' . count($students) . ' students for export');
+            
+            // Debug: verificar estrutura dos dados
+            if (!empty($students)) {
+                error_log('SM Student Control: First student structure: ' . print_r($students[0], true));
+            }
 
             if (empty($students)) {
                 error_log('SM Student Control: No students found for export');
@@ -390,16 +395,28 @@ class SM_Student_Control_Admin {
 
             // Preencher com dados reais dos alunos
             foreach ($students as $student) {
-                // Obter dados do usuário
-                $user_info = get_userdata($student['user_id']);
-                
+                // Os dados já vêm processados do cache, usar diretamente
                 $row = [
-                    $student['user_id'],
-                    $user_info ? $user_info->display_name : 'N/A',
-                    $user_info ? $user_info->user_email : 'N/A',
-                    $user_info ? $user_info->user_registered : 'N/A',
-                    isset($student['last_login_formatted']) ? $student['last_login_formatted'] : '-',
-                    isset($student['enrolled_courses_count']) ? $student['enrolled_courses_count'] : 0
+                    $student['id'], // ID já processado
+                    $student['full_name'], // Nome já processado
+                    $student['email'], // Email já processado
+                    // Data de registro
+                    is_array($student['registration_date']) ? 
+                        ($student['registration_date']['formatted'] ?? '-') : 
+                        ($student['registration_date'] ?: '-'),
+                    // Último acesso
+                    !empty($student['last_access']) ? 
+                        (is_array($student['last_access']) ? 
+                            ($student['last_access']['formatted'] ?? '-') : 
+                            (is_numeric($student['last_access']) ? 
+                                date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $student['last_access']) :
+                                $student['last_access']
+                            )
+                        ) : '-',
+                    // Cursos matriculados
+                    is_array($student['enrolled_courses']) ? 
+                        count($student['enrolled_courses']) : 
+                        intval($student['enrolled_courses'])
                 ];
                 
                 fputcsv($file, $row, ';');
